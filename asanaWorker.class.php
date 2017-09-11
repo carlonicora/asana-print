@@ -106,7 +106,7 @@ class asanaWorker {
     }
 
     private function saveToken(){
-        setcookie('clientToken', $this->clientToken, time() + 30, "/");
+        setcookie('clientToken', $this->clientToken, time() + 3000, "/");
     }
 
     private function analyseCallVariables(){
