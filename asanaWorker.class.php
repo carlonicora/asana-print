@@ -15,6 +15,8 @@ class asanaWorker {
     private $asanaUser;
 
     public function render(){
+        $this->analyseCallVariables();
+
         $this->initialiseEnv();
 
         session_start();
@@ -24,7 +26,7 @@ class asanaWorker {
         $this->initialiseAsana();
 
         if (isset($this->clientToken)) {
-            $this->analyseCallVariables();
+
 
             if (isset($this->asanaUser)){
                 $this->page = asanaPages::PRINTABLE;
@@ -69,39 +71,41 @@ class asanaWorker {
             $this->clientToken = $_SESSION['clientToken'];
         } else {
             if (isset($_COOKIE['clientToken'])){
-                $this->clientToken = $_SESSION['token'] = $_COOKIE['clientToken'];
+                $this->clientToken = $_SESSION['clientToken'] = $_COOKIE['clientToken'];
             }
-        }
-
-        if (isset($this->clientToken)){
-            $this->initialiseAsana();
         }
     }
 
     private function initialiseAsana(){
-        $this->asana = Asana\Client::oauth(array(
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
-            'redirect_uri' => (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'.$_SERVER['HTTP_HOST'],
-            'token' => $this->clientToken
-        ));
-    }
-
-    private function analyseCallVariables(){
-        if (!(isset($_SERVER['REQUEST_URI']) && strlen($_SERVER['REQUEST_URI'])==1 && $_SERVER['REQUEST_URI']='/')){
-            $uri = substr($_SERVER['REQUEST_URI'], 1);
-            list($this->asanaWorkspace, $this->asanaUser) = array_pad(explode('/', $uri, 2), 2, null);
+        if (!isset($this->clientToken)) {
+            $this->asana = Asana\Client::oauth(array(
+                'client_id' => $this->clientId,
+                'client_secret' => $this->clientSecret,
+                'redirect_uri' => (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'.$_SERVER['HTTP_HOST']
+            ));
+        } else {
+            $this->asana = Asana\Client::oauth(array(
+                'client_id' => $this->clientId,
+                'refresh_token' => $this->clientToken
+            ));
         }
     }
 
+    private function analyseCallVariables(){
+
+        $uri = strtok($_SERVER["REQUEST_URI"],'?');
+
+        if (!(isset($uri) && strlen($uri)==1 && $uri='/')){
+            list($this->asanaWorkspace, $this->asanaUser) = array_pad(explode('/', substr($uri, 1), 2), 2, null);
+        }
+    }
     private function receiveCallBack(){
-        if ($_SESSION['state'] == $_GET['state']) {
+        if ($_SESSION['asanaState'] == $_GET['state']) {
             $temporaryToken = $this->asana->dispatcher->fetchToken($_GET['code']);
             $this->clientToken = $_SESSION['clientToken'] = $this->asana->dispatcher->refreshAccessToken();
 
             setcookie('clientToken', $this->clientToken, time() + (86400 * 30), "/");
             header('Location: /');
-            exit;
         } else {
             $this->template->failedLogin = true;
             $this->page = asanaPages::LOGIN;
@@ -150,6 +154,10 @@ class asanaWorker {
 
     private function login(){
         $state = null;
+
+        if (isset($_SESSION['asanaState'])) {
+            $state = $_SESSION['asanaState'];
+        }
         $url = $this->asana->dispatcher->authorizationUrl($state);
 
         if (!isset($this->template->failedLogin)){
@@ -158,11 +166,10 @@ class asanaWorker {
 
         $this->template->url = $url;
 
-        $_SESSION['state'] = $state;
+        $_SESSION['asanaState'] = $state;
 
         $this->requireDefaultPage();
     }
-
     private function printable(){
         $user = $this->asana->users->findById($this->asanaUser);
 
