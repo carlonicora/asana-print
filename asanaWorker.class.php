@@ -8,6 +8,7 @@ class asanaWorker {
     private $clientId;
     private $clientSecret;
     private $clientToken;
+    private $refreshToken;
     private $page;
     private $asana;
 
@@ -67,17 +68,27 @@ class asanaWorker {
     }
 
     private function initialiseSessionVariables(){
-        if (isset($_SESSION['clientToken'])){
-            $this->clientToken = $_SESSION['clientToken'];
-        } else {
-            if (isset($_COOKIE['clientToken'])){
-                $this->clientToken = $_SESSION['clientToken'] = $_COOKIE['clientToken'];
-            }
+        if (isset($_COOKIE['clientToken'])){
+            $this->clientToken = $_COOKIE['clientToken'];
+        }
+
+        if (isset($_COOKIE['refreshToken'])){
+            $this->refreshToken = $_COOKIE['refreshToken'];
         }
     }
 
     private function initialiseAsana(){
-        if (!isset($this->clientToken)) {
+        $this->setAsana();
+
+        if (isset($this->refreshToken) && !isset($this->clientToken)) {
+            $this->clientToken = $this->asana->dispatcher->refreshAccessToken();
+            $this->saveToken();
+            $this->setAsana();
+        }
+    }
+
+    private function setAsana(){
+        if (!isset($this->refreshToken)) {
             $this->asana = Asana\Client::oauth(array(
                 'client_id' => $this->clientId,
                 'client_secret' => $this->clientSecret,
@@ -86,9 +97,16 @@ class asanaWorker {
         } else {
             $this->asana = Asana\Client::oauth(array(
                 'client_id' => $this->clientId,
-                'refresh_token' => $this->clientToken
+                'client_secret' => $this->clientSecret,
+                'redirect_uri' => (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'.$_SERVER['HTTP_HOST'],
+                'token' => $this->clientToken,
+                'refresh_token' => $this->refreshToken
             ));
         }
+    }
+
+    private function saveToken(){
+        setcookie('clientToken', $this->clientToken, time() + 30, "/");
     }
 
     private function analyseCallVariables(){
@@ -101,10 +119,13 @@ class asanaWorker {
     }
     private function receiveCallBack(){
         if ($_SESSION['asanaState'] == $_GET['state']) {
-            $temporaryToken = $this->asana->dispatcher->fetchToken($_GET['code']);
-            $this->clientToken = $_SESSION['clientToken'] = $this->asana->dispatcher->refreshAccessToken();
+            $this->clientToken = $this->asana->dispatcher->fetchToken($_GET['code']);
 
-            setcookie('clientToken', $this->clientToken, time() + (86400 * 30), "/");
+            $this->saveToken();
+
+            $this->refreshToken = $this->asana->dispatcher->refreshToken;//$this->asana->dispatcher->refreshAccessToken();
+            setcookie('refreshToken', $this->refreshToken, 0, "/");
+
             header('Location: /');
         } else {
             $this->template->failedLogin = true;
