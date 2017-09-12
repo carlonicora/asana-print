@@ -193,34 +193,65 @@ class asanaWorker {
     }
     private function printable(){
         $user = $this->asana->users->findById($this->asanaUser);
-
-        $asanaTasks = $this->asana->tasks->findAll(
-            array(
-                'assignee' => $this->asanaUser,
-                'workspace' => $this->asanaWorkspace,
-                'completed_since' => 'now'
-            ),
-            array('fields'=>array('name', 'assignee_status'))
-        );
+        $this->template->username = $user->name;
 
         $today = array();
         $upcoming = array();
         $new = array();
 
+        $workspaces = array();
 
-        $this->template->username = $user->name;
+        if ($this->asanaWorkspace == "*"){
+            $asanaWorkspaces = $this->asana->workspaces->findAll();
 
-        if (isset($asanaTasks)) {
-            foreach ($asanaTasks as $asanaTask) {
-                $task = new stdClass();
-                $task->name = $asanaTask->name;
+            foreach ($asanaWorkspaces as $asanaWorkspace) {
+                $workspaces[] = $asanaWorkspace->id;
+            }
+        } else {
+            $workspaces[] = $this->asanaWorkspace;
+        }
 
-                if ($asanaTask->assignee_status == 'today'){
-                    $today[] = $task;
-                } else if ($asanaTask->assignee_status == 'upcoming') {
-                    $upcoming[] = $task;
-                } else if ($asanaTask->assignee_status == 'inbox') {
-                    $new[] = $task;
+        foreach ($workspaces as $workspaceId) {
+            $workspace = $this->asana->workspaces->findById($workspaceId);
+
+
+            $users = $this->asana->users->findByWorkspace($workspaceId);
+
+            foreach ($users as $user) {
+                if ($user->id == $this->asanaUser) {
+                    $asanaTasks = $this->asana->tasks->findAll(
+                        array(
+                            'assignee' => $this->asanaUser,
+                            'workspace' => $workspaceId,
+                            'completed_since' => 'now'
+                        ),
+                        array('fields' => array('name', 'assignee_status'))
+                    );
+
+                    if (isset($asanaTasks)) {
+                        foreach ($asanaTasks as $asanaTask) {
+                            if (substr($asanaTask->name, -1) != ':') {
+                                $task = new stdClass();
+                                $task->name = $asanaTask->name;
+                                $task->id = $asanaTask->id;
+                                $task->workspaceId = $workspace->id;
+                                if ($this->asanaWorkspace == "*") {
+                                    $task->workspace = $workspace->name;
+                                    $task->inGlobalList = true;
+                                } else {
+                                    $task->inGlobalList = false;
+                                }
+
+                                if ($asanaTask->assignee_status == 'today') {
+                                    $today[] = $task;
+                                } else if ($asanaTask->assignee_status == 'upcoming') {
+                                    $upcoming[] = $task;
+                                } else if ($asanaTask->assignee_status == 'inbox') {
+                                    $new[] = $task;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

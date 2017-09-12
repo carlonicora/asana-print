@@ -3,7 +3,7 @@
 <?php
 foreach ($new as $task){
     ?>
-    <input type="checkbox"><?php echo $task->name; ?> <br/>
+    <input type="checkbox"><?php echo $task->name; ?> <?php if ($task->inGlobalList == true) echo '<em>['.$task->workspace.']</em>' ?> <a href="https://app.asana.com/0/<?php echo $task->workspaceId; ?>/<?php echo $task->id; ?>/" target="_blank">&gt;</a> <br/>
     <?php
 }
 ?>
@@ -11,7 +11,7 @@ foreach ($new as $task){
 <?php
 foreach ($today as $task){
     ?>
-    <input type="checkbox"><?php echo $task->name; ?> <br/>
+    <input type="checkbox"><?php echo $task->name; ?> <?php if ($task->inGlobalList == true) echo '<em>['.$task->workspace.']</em>' ?> <a href="https://app.asana.com/0/<?php echo $task->workspaceId; ?>/<?php echo $task->id; ?>/" target="_blank">&gt;</a> <br/>
     <?php
 }
 ?>
@@ -19,7 +19,7 @@ foreach ($today as $task){
 <?php
 foreach ($upcoming as $task){
     ?>
-<input type="checkbox"><?php echo $task->name; ?> <br/>
+<input type="checkbox"><?php echo $task->name; ?> <?php if ($task->inGlobalList == true) echo '<em>['.$task->workspace.']</em>' ?> <a href="https://app.asana.com/0/<?php echo $task->workspaceId; ?>/<?php echo $task->id; ?>/" target="_blank">&gt;</a> <br/>
 <?php
 }
 ?>
